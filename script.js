@@ -2,12 +2,10 @@ function atualizarCampos() {
     const tipo = document.getElementById("tipoRede").value;
     const campos = document.getElementById("camposDinamicos");
     const resultado = document.getElementById("resultado");
-    const botaoPdf = document.getElementById("btnPdf");
 
     campos.innerHTML = "";
     resultado.className = "resultado resultado-vazio";
     resultado.innerHTML = "Preencha os dados e clique em Calcular.";
-    botaoPdf.style.display = "none";
 
     if (tipo === "mono") {
         campos.innerHTML = `
@@ -42,10 +40,6 @@ function atualizarCampos() {
         `;
     }
 }
-
-/* =========================
-   TABELAS INTERNAS DA EMPRESA
-========================= */
 
 const disjuntoresMono = [
     { corrente: 10, erp: "79516", descricao: "DISJUNTOR UNIPOLAR 10A MDWP-B10" },
@@ -84,10 +78,6 @@ const cabos = [
     { bitola: 16, capacidade: 68, erp: "131164", descricao: "CABO PP 5X16MM² 70°C 750V BR/PT/VM/AZ/VD-AM" },
     { bitola: 25, capacidade: 89, erp: "141292", descricao: "CABO PP 5X25MM² 70°C 750V BR/PT/VM/AZ/VD-AM" }
 ];
-
-/* =========================
-   FUNÇÕES AUXILIARES
-========================= */
 
 function formatarNumero(valor) {
     return Number(valor).toLocaleString("pt-BR", {
@@ -176,21 +166,38 @@ function statusComponente(item) {
 
 function mostrarErro(mensagem) {
     const resultado = document.getElementById("resultado");
-    const botaoPdf = document.getElementById("btnPdf");
-
     resultado.className = "resultado";
     resultado.innerHTML = `<div class="erro">${mensagem}</div>`;
-    botaoPdf.style.display = "none";
 }
 
-/* =========================
-   CÁLCULO PRINCIPAL
-========================= */
+function abrirLoading() {
+    document.getElementById("loadingModal").classList.remove("oculto");
+}
+
+function fecharLoading() {
+    document.getElementById("loadingModal").classList.add("oculto");
+}
+
+function iniciarCalculo() {
+    abrirLoading();
+    setTimeout(() => {
+        fecharLoading();
+        calcular();
+    }, 5000);
+}
+
+function criarBlocoMemoria(texto) {
+    return `
+        <div class="memoria-wrapper">
+            <h3 class="memoria-titulo">Memória de cálculo</h3>
+            <div class="memoria-calculo">${texto}</div>
+        </div>
+    `;
+}
 
 function calcular() {
     const tipo = document.getElementById("tipoRede").value;
     const resultado = document.getElementById("resultado");
-    const botaoPdf = document.getElementById("btnPdf");
     const dadosFP = obterFP();
 
     if (!tipo) {
@@ -208,11 +215,15 @@ function calcular() {
         ? "Fator de potência informado pelo usuário."
         : "Fator de potência não informado. Foi adotado o valor padrão de 0,92.";
 
+    const margem = 1.25;
+
     let tipoDescricao = "";
     let potenciaTotal = 0;
     let maiorCorrente = 0;
+    let correnteComMargem = 0;
     let correntes = [];
     let tipoSistemaParaTabela = "";
+    let memoriaCalculo = "";
 
     if (tipo === "mono") {
         const potencia = parseFloat(document.getElementById("potMono").value) || 0;
@@ -227,10 +238,30 @@ function calcular() {
         tipoDescricao = "Monofásica 220 V";
         potenciaTotal = potencia;
         maiorCorrente = corrente;
+        correnteComMargem = maiorCorrente * margem;
         correntes = [
-            { nome: "Corrente calculada", valor: corrente }
+            { nome: "Corrente calculada", valor: corrente },
+            { nome: "Corrente com margem (25%)", valor: correnteComMargem }
         ];
         tipoSistemaParaTabela = "mono";
+
+        memoriaCalculo =
+`<span class="memoria-formula">1) Fórmula:</span>
+I = P / (V × fp)
+
+<span class="memoria-formula">2) Substituindo:</span>
+I = ${formatarNumero(potencia)} / (220,00 × ${formatarNumero(fp)})
+
+<span class="memoria-formula">3) Denominador:</span>
+220,00 × ${formatarNumero(fp)} = ${formatarNumero(220 * fp)}
+
+<span class="memoria-formula">4) Corrente:</span>
+I = ${formatarNumero(potencia)} / ${formatarNumero(220 * fp)}
+<span class="memoria-final">I = ${formatarNumero(corrente)} A</span>
+
+<span class="memoria-formula">5) Margem de 25%:</span>
+Icorrigida = ${formatarNumero(corrente)} × 1,25
+<span class="memoria-final">Icorrigida = ${formatarNumero(correnteComMargem)} A</span>`;
     }
 
     if (tipo === "tri220") {
@@ -243,20 +274,63 @@ function calcular() {
             return;
         }
 
-        const correnteRT = potRT / (220 * fp);
-        const correnteSR = potSR / (220 * fp);
-        const correnteTS = potTS / (220 * fp);
+        const Iab = potRT / (220 * fp);
+        const Ibc = potSR / (220 * fp);
+        const Ica = potTS / (220 * fp);
+
+        const Ia = Math.sqrt((Iab ** 2) + (Ica ** 2) - (Iab * Ica));
+        const Ib = Math.sqrt((Iab ** 2) + (Ibc ** 2) - (Iab * Ibc));
+        const Ic = Math.sqrt((Ibc ** 2) + (Ica ** 2) - (Ibc * Ica));
 
         tipoDescricao = "Trifásica 220 V sem neutro";
         potenciaTotal = potRT + potSR + potTS;
-        maiorCorrente = Math.max(correnteRT, correnteSR, correnteTS);
+        maiorCorrente = Math.max(Ia, Ib, Ic);
+        correnteComMargem = maiorCorrente * margem;
         correntes = [
-            { nome: "Corrente R-T", valor: correnteRT },
-            { nome: "Corrente S-R", valor: correnteSR },
-            { nome: "Corrente T-S", valor: correnteTS },
-            { nome: "Maior corrente considerada", valor: maiorCorrente }
+            { nome: "Corrente de ramo R-T", valor: Iab },
+            { nome: "Corrente de ramo S-R", valor: Ibc },
+            { nome: "Corrente de ramo T-S", valor: Ica },
+            { nome: "Corrente fase R", valor: Ia },
+            { nome: "Corrente fase S", valor: Ib },
+            { nome: "Corrente fase T", valor: Ic },
+            { nome: "Maior corrente considerada", valor: maiorCorrente },
+            { nome: "Corrente com margem (25%)", valor: correnteComMargem }
         ];
         tipoSistemaParaTabela = "tri";
+
+        memoriaCalculo =
+`<span class="memoria-formula">1) Correntes de ramo:</span>
+Iab = P(R-T) / (220 × fp)
+Iab = ${formatarNumero(potRT)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">Iab = ${formatarNumero(Iab)} A</span>
+
+Ibc = P(S-R) / (220 × fp)
+Ibc = ${formatarNumero(potSR)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">Ibc = ${formatarNumero(Ibc)} A</span>
+
+Ica = P(T-S) / (220 × fp)
+Ica = ${formatarNumero(potTS)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">Ica = ${formatarNumero(Ica)} A</span>
+
+<span class="memoria-formula">2) Correntes de fase:</span>
+Ia = √(Iab² + Ica² − Iab × Ica)
+Ia = √(${formatarNumero(Iab)}² + ${formatarNumero(Ica)}² − ${formatarNumero(Iab)} × ${formatarNumero(Ica)})
+<span class="memoria-final">Ia = ${formatarNumero(Ia)} A</span>
+
+Ib = √(Iab² + Ibc² − Iab × Ibc)
+Ib = √(${formatarNumero(Iab)}² + ${formatarNumero(Ibc)}² − ${formatarNumero(Iab)} × ${formatarNumero(Ibc)})
+<span class="memoria-final">Ib = ${formatarNumero(Ib)} A</span>
+
+Ic = √(Ibc² + Ica² − Ibc × Ica)
+Ic = √(${formatarNumero(Ibc)}² + ${formatarNumero(Ica)}² − ${formatarNumero(Ibc)} × ${formatarNumero(Ica)})
+<span class="memoria-final">Ic = ${formatarNumero(Ic)} A</span>
+
+<span class="memoria-formula">3) Maior corrente:</span>
+<span class="memoria-final">Imax = ${formatarNumero(maiorCorrente)} A</span>
+
+<span class="memoria-formula">4) Margem de 25%:</span>
+Icorrigida = ${formatarNumero(maiorCorrente)} × 1,25
+<span class="memoria-final">Icorrigida = ${formatarNumero(correnteComMargem)} A</span>`;
     }
 
     if (tipo === "tri380") {
@@ -276,26 +350,50 @@ function calcular() {
         tipoDescricao = "Trifásica 380 V com neutro";
         potenciaTotal = potRN + potSN + potTN;
         maiorCorrente = Math.max(correnteRN, correnteSN, correnteTN);
+        correnteComMargem = maiorCorrente * margem;
         correntes = [
             { nome: "Corrente R-N", valor: correnteRN },
             { nome: "Corrente S-N", valor: correnteSN },
             { nome: "Corrente T-N", valor: correnteTN },
-            { nome: "Maior corrente considerada", valor: maiorCorrente }
+            { nome: "Maior corrente considerada", valor: maiorCorrente },
+            { nome: "Corrente com margem (25%)", valor: correnteComMargem }
         ];
         tipoSistemaParaTabela = "tri";
+
+        memoriaCalculo =
+`<span class="memoria-formula">1) Correntes de fase:</span>
+IR = P(R-N) / (220 × fp)
+IR = ${formatarNumero(potRN)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">IR = ${formatarNumero(correnteRN)} A</span>
+
+IS = P(S-N) / (220 × fp)
+IS = ${formatarNumero(potSN)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">IS = ${formatarNumero(correnteSN)} A</span>
+
+IT = P(T-N) / (220 × fp)
+IT = ${formatarNumero(potTN)} / (220,00 × ${formatarNumero(fp)})
+<span class="memoria-final">IT = ${formatarNumero(correnteTN)} A</span>
+
+<span class="memoria-formula">2) Maior corrente:</span>
+<span class="memoria-final">Imax = ${formatarNumero(maiorCorrente)} A</span>
+
+<span class="memoria-formula">3) Margem de 25%:</span>
+Icorrigida = ${formatarNumero(maiorCorrente)} × 1,25
+<span class="memoria-final">Icorrigida = ${formatarNumero(correnteComMargem)} A</span>`;
     }
 
-    const disjuntor = selecionarDisjuntor(maiorCorrente, tipoSistemaParaTabela);
+    const disjuntor = selecionarDisjuntor(correnteComMargem, tipoSistemaParaTabela);
     const cabo = disjuntor ? selecionarCaboPeloDisjuntor(disjuntor.corrente) : null;
     const seccionador = disjuntor ? selecionarSeccionadora(disjuntor.corrente) : null;
 
     const observacoes = [];
     observacoes.push(origemFP);
+    observacoes.push("Foi aplicada uma margem de 25% sobre a maior corrente para seleção do disjuntor.");
     observacoes.push("A seleção de cabo é um pré-dimensionamento com base na tabela interna cadastrada.");
     observacoes.push("O fechamento final deve considerar método de instalação, agrupamento, temperatura, queda de tensão e demais critérios do projeto.");
 
     if (!disjuntor) {
-        observacoes.push("Não existe disjuntor compatível cadastrado na tabela interna da empresa para essa corrente.");
+        observacoes.push("Não existe disjuntor compatível cadastrado na tabela interna da empresa para essa corrente com margem.");
     }
 
     if (disjuntor && !cabo) {
@@ -339,6 +437,8 @@ function calcular() {
         criarLinha("Descrição", seccionador ? seccionador.descricao : "Não existe componente compatível na tabela interna")
     ]);
 
+    const blocoMemoria = criarBlocoMemoria(memoriaCalculo);
+
     const blocoObs = `
         <div class="resultado-bloco alerta">
             <h3>Observações</h3>
@@ -356,13 +456,8 @@ function calcular() {
             ${blocoDisjuntor}
             ${blocoCabo}
             ${blocoSeccionador}
+            ${blocoMemoria}
             ${blocoObs}
         </div>
     `;
-
-    botaoPdf.style.display = "inline-block";
-}
-
-function gerarPDF() {
-    window.print();
 }
