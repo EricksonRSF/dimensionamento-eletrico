@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dimensionamento Elétrico</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <div class="topo">
+            <h1>Dimensionamento Elétrico</h1>
+            <p>Pré-dimensionamento de corrente, disjuntor, cabo e seccionador</p>
+        </div>
+
+        <div class="card">
+            <label for="tipoRede">Tipo de alimentação</label>
+            <select id="tipoRede" onchange="atualizarCampos()">
+                <option value="">Selecione</option>
+                <option value="mono">Monofásica 220 V</option>
+                <option value="tri220">Trifásica 220 V sem neutro</option>
+                <option value="tri380">Trifásica 380 V com neutro</option>
+            </select>
+
+            <label for="fp">Fator de potência (opcional)</label>
+            <input
+                type="text"
+                id="fp"
+                placeholder="Se não informar, será adotado 0,92"
+            >
+
+            <div id="camposDinamicos"></div>
+
+            <div class="botoes">
+    <button class="btn btn-calcular" onclick="calcular()">Calcular</button>
+    <button class="btn btn-pdf" id="btnPdf" onclick="gerarPDF()" style="display: none;">Gerar PDF</button>
+</div>
+        </div>
+
+        <div class="card">
+            <h2>Resultado</h2>
+            <div class="resultado resultado-vazio" id="resultado">
+                Selecione o tipo de alimentação e preencha os dados.
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
