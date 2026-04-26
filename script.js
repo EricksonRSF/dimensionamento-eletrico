@@ -10,33 +10,37 @@ function atualizarCampos() {
     if (tipo === "mono") {
         campos.innerHTML = `
             <label for="potMono">Potência total (W)</label>
-            <input type="number" id="potMono" placeholder="Ex.: 4500">
+            <input type="number" id="potMono" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 4500">
         `;
     }
 
     if (tipo === "tri220") {
         campos.innerHTML = `
+            <div class="campo-ajuda">
+                Informe a potência real ligada entre cada par de fases. O sistema calcula a corrente nos cabos R, S e T pela soma vetorial dos ramos.
+            </div>
+
             <label for="potRT">Potência entre R-T (W)</label>
-            <input type="number" id="potRT" placeholder="Ex.: 3000">
+            <input type="number" id="potRT" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 3000">
 
             <label for="potSR">Potência entre S-R (W)</label>
-            <input type="number" id="potSR" placeholder="Ex.: 2500">
+            <input type="number" id="potSR" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 2500">
 
             <label for="potTS">Potência entre T-S (W)</label>
-            <input type="number" id="potTS" placeholder="Ex.: 2800">
+            <input type="number" id="potTS" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 2800">
         `;
     }
 
     if (tipo === "tri380") {
         campos.innerHTML = `
             <label for="potRN">Potência entre R-N (W)</label>
-            <input type="number" id="potRN" placeholder="Ex.: 2000">
+            <input type="number" id="potRN" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 2000">
 
             <label for="potSN">Potência entre S-N (W)</label>
-            <input type="number" id="potSN" placeholder="Ex.: 1800">
+            <input type="number" id="potSN" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 1800">
 
             <label for="potTN">Potência entre T-N (W)</label>
-            <input type="number" id="potTN" placeholder="Ex.: 2200">
+            <input type="number" id="potTN" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 2200">
         `;
     }
 }
@@ -183,7 +187,7 @@ function iniciarCalculo() {
     setTimeout(() => {
         fecharLoading();
         calcular();
-    }, 5000);
+    }, 800);
 }
 
 function criarBlocoMemoria(texto) {
@@ -278,9 +282,9 @@ Icorrigida = ${formatarNumero(corrente)} × 1,25
         const Ibc = potSR / (220 * fp);
         const Ica = potTS / (220 * fp);
 
-        const Ia = Math.sqrt((Iab ** 2) + (Ica ** 2) - (Iab * Ica));
-        const Ib = Math.sqrt((Iab ** 2) + (Ibc ** 2) - (Iab * Ibc));
-        const Ic = Math.sqrt((Ibc ** 2) + (Ica ** 2) - (Ibc * Ica));
+        const Ia = Math.sqrt((Iab ** 2) + (Ibc ** 2) + (Iab * Ibc));
+        const Ib = Math.sqrt((Ibc ** 2) + (Ica ** 2) + (Ibc * Ica));
+        const Ic = Math.sqrt((Ica ** 2) + (Iab ** 2) + (Ica * Iab));
 
         tipoDescricao = "Trifásica 220 V sem neutro";
         potenciaTotal = potRT + potSR + potTS;
@@ -313,16 +317,16 @@ Ica = ${formatarNumero(potTS)} / (220,00 × ${formatarNumero(fp)})
 <span class="memoria-final">Ica = ${formatarNumero(Ica)} A</span>
 
 <span class="memoria-formula">2) Correntes de fase:</span>
-Ia = √(Iab² + Ica² − Iab × Ica)
-Ia = √(${formatarNumero(Iab)}² + ${formatarNumero(Ica)}² − ${formatarNumero(Iab)} × ${formatarNumero(Ica)})
+Ia = √(Iab² + Ibc² + Iab × Ibc)
+Ia = √(${formatarNumero(Iab)}² + ${formatarNumero(Ibc)}² + ${formatarNumero(Iab)} × ${formatarNumero(Ibc)})
 <span class="memoria-final">Ia = ${formatarNumero(Ia)} A</span>
 
-Ib = √(Iab² + Ibc² − Iab × Ibc)
-Ib = √(${formatarNumero(Iab)}² + ${formatarNumero(Ibc)}² − ${formatarNumero(Iab)} × ${formatarNumero(Ibc)})
+Ib = √(Ibc² + Ica² + Ibc × Ica)
+Ib = √(${formatarNumero(Ibc)}² + ${formatarNumero(Ica)}² + ${formatarNumero(Ibc)} × ${formatarNumero(Ica)})
 <span class="memoria-final">Ib = ${formatarNumero(Ib)} A</span>
 
-Ic = √(Ibc² + Ica² − Ibc × Ica)
-Ic = √(${formatarNumero(Ibc)}² + ${formatarNumero(Ica)}² − ${formatarNumero(Ibc)} × ${formatarNumero(Ica)})
+Ic = √(Ica² + Iab² + Ica × Iab)
+Ic = √(${formatarNumero(Ica)}² + ${formatarNumero(Iab)}² + ${formatarNumero(Ica)} × ${formatarNumero(Iab)})
 <span class="memoria-final">Ic = ${formatarNumero(Ic)} A</span>
 
 <span class="memoria-formula">3) Maior corrente:</span>
@@ -391,6 +395,10 @@ Icorrigida = ${formatarNumero(maiorCorrente)} × 1,25
     observacoes.push("Foi aplicada uma margem de 25% sobre a maior corrente para seleção do disjuntor.");
     observacoes.push("A seleção de cabo é um pré-dimensionamento com base na tabela interna cadastrada.");
     observacoes.push("O fechamento final deve considerar método de instalação, agrupamento, temperatura, queda de tensão e demais critérios do projeto.");
+
+    if (tipo === "tri220") {
+        observacoes.push("No sistema trifásico 220 V sem neutro, as correntes R, S e T foram calculadas pela soma vetorial das potências ligadas entre fases.");
+    }
 
     if (!disjuntor) {
         observacoes.push("Não existe disjuntor compatível cadastrado na tabela interna da empresa para essa corrente com margem.");

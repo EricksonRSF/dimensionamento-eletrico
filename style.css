@@ -143,6 +143,17 @@ select:focus {
     box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.22);
 }
 
+.campo-ajuda {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(34, 211, 238, 0.10);
+    border: 1px solid rgba(34, 211, 238, 0.18);
+    color: var(--muted);
+    line-height: 1.5;
+    font-size: 14px;
+}
+
 .botoes {
     display: flex;
     gap: 12px;
